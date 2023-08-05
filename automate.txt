@@ -1,0 +1,163 @@
+// When powered on, the Mind Stone continuously
+// executes instructions given to it.
+// Instructions must be scribed in Stonescript.
+// Learn more at:
+// StoneStoryRPG.com/stonescript
+// -Bezerra, the Sage
+
+import Fishing
+import Cosmetics/PetBoo
+import Cosmetics/Hats/Skully
+
+var debug = false
+var pause_at_boss = true
+
+?foe = boss & pause_at_boss = true
+  loc.Pause()
+
+func use_blade()
+  ?item.GetCooldown("blade") <= 0
+    equip blade
+    activate R
+
+func use_heavy_hammer()
+  ?item.GetCooldown("hammer") <= 0
+    equip heavy hammer
+    activate R
+
+func use_skeleton_arm()
+  ?item.GetColdown("skeleton_arm") <= 0
+    equip skeleton arm
+    activate R
+
+func equip_hammer()
+  ?foe = aether
+    equipL hammer vigor
+  :?foe = fire
+    equipL hammer aether
+  :?foe = ice
+    equipL hammer fire
+  :?foe= poison
+    equipL hammer ice
+  :?foe = vigor
+    equipL hammer poison
+  :
+    equipL hammer
+
+func equip_shield()
+  ?foe = aether
+    equipR shield vigor
+  :?foe = fire
+    equipR shield aether
+  :?foe = ice
+    equipR shield fire
+  :?foe= poison
+    equipR shield ice
+  :?foe = vigor
+    equipR shield poison
+  :?foe = scarab
+    equipR shield dash
+  :
+    equipR shield
+
+
+func equip_sword()
+  ?foe = aether
+    equipL sword vigor
+  :?foe = fire
+    equipL sword aether
+  :?foe = ice
+    equipL sword fire
+  :?foe= poison
+    equipL sword ice
+  :?foe = vigor
+    equipL sword poison +2
+    equipR sword poison +3
+  :
+    equipL sword
+
+func use_melee()
+  ?foe.armor > 0
+    equip_hammer()
+  :
+    equip_sword()
+ // equip_shield()
+
+func equip_melee()
+  ?foe = boss
+    use_melee()
+    
+    ?foe ! angry
+      use_blade()
+  :
+    use_melee()
+  
+func equip_ranged()
+  ?foe = boss & foe ! bronze
+    equipL hammer
+    equipR dash
+  :?foe = mosquito | foe = magic_resist
+    equip repeating crossbow
+  :?foe = scarab
+    equipL hammer
+    equipR dash
+  :?foe = wall & foe = ice
+    equipL hammer
+    equipR dash
+  :?foe = aether
+    equipL wand vigor
+    equipR shield vigor
+  :?foe = fire
+    equipL wand aether
+    equipR shield aether
+  :?foe = ice
+    equipL wand fire
+    equipR shield fire
+  :?foe = poison
+    equipL wand ice
+    equipR shield ice
+  :?foe = vigor
+    equipL wand poison +2
+    equipR wand poison +3
+
+func survive()
+  ?loc.begin & item.potion = empty
+    brew stone + tar
+  ?hp <= 16
+    activate potion
+  ?target = waypoint | foe.distance > 32
+    ?hp < maxhp
+      equipL ouroboros
+    :
+      equipL triskelion
+    equipR shield
+
+func attack()
+  ?foe.distance <= 24
+    ?foe.distance <= 8 & foe ! immune_to_physica
+      equip_melee()
+    :
+      equip_ranged()
+
+func gather()
+  ?loc = rocky & foe = boss
+    ?res.stone < 1024
+      loc.Leave()
+    :
+      loc.Pause()
+  ?pickup.distance < 10
+    equipL star
+    equipR shield
+  ?harvest.distance < 10
+    ?loc = rocky & res.stone < 1024
+      equip shovel
+    ?loc = deadwood & res.wood < 1024
+      equipR hatchet
+      ?harvest.distance <= 4 &
+      ^item.GetCooldown("hatchet") <= 0
+        activate R
+      
+
+survive()
+attack()
+gather()
