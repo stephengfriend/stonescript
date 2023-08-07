@@ -9,10 +9,5 @@ sys.SetFileUrl(
 ^＂stephengfriend/stonescript@main/＂
 ^)
 
-?loc ! Gate &
-^loc ! Shop &
-^loc ! Waterfall
-  import Automate
-  import Cooldowns
-//  import Debug
+import Main
 ```

@@ -1,0 +1,1237 @@
+﻿
+// Deadwood Fishing
+// by: standardcombo
+var version = "0.6.4b"
+
+var x = 0
+var y = 0
+var s = ""
+
+var uiX = -11
+var uiY = 7
+var barColor = #303030
+var progressValue = 1000
+var progressPositive = 7
+var progressNegative = 14
+var progressX = uiX + 1
+var progressY = uiY + 3
+var progressColor = 00ff00
+var hasPulled = false
+var isFtue = false
+
+var fishWidth = 600
+var fishArea = 2300
+var fishLimit = fishArea - fishWidth
+var fishMinSpeed = -70
+var fishMaxSpeed = 100
+var fishAccelMin = 5
+var fishAccelMax = 25
+var fishAccelDelay = 30
+var reelImpulse = 180
+var reelBadLow = 450
+var reelGoodLow = 600
+var reelGoodHigh = 1200
+var reelBadHigh = 1350
+
+var fishPos = 0
+var fishSpeed = 0
+var fishAccel = 0
+var fishDrawX = 0
+var fishDrawY = uiY + 1
+var fish
+
+var isFishStatsDialogEnabled = true
+var isRecordWeight = false
+
+var waitTimeMin = 30 * 2
+var waitTimeMax = 30 * 10
+
+var progress = import Games/Fishing/FishingProgress
+var shop = import Games/Fishing/FishingShop
+var logo = import Games/Fishing/FishingLogo
+logo.version = version
+
+var fishFactory = import Games/Fishing/FishFactory
+var rodFactory = import Games/Fishing/RodFactory
+var flyup = import Games/FlyupText
+
+// States:
+// - Arriving
+// - Menu
+// - Throwing
+// - Waiting
+// - Catching
+// - Fail1
+// - Fail2
+// - Success1
+// - Success2
+// - Success3
+// - Collection
+// - Shop
+
+var state = Arriving
+var stateTime = 0
+
+var playButton = null
+func AddMenuUI()
+  ?playButton = null
+    var button = ui.AddButton()
+    button.anchor = top_right
+    button.dock = top_right
+    button.x = -13
+    button.y = 13
+    button.text = te.xt(Play)
+    button.SetPressed(OnPlayPressed)
+    playButton = button
+
+func RemoveMenuUI()
+  ?playButton ! null
+    playButton.Recycle()
+  playButton = null
+
+func OnPlayPressed()
+  SetState(Throwing)
+
+
+func Reset()
+  RemoveMenuUI()
+  SetState(Arriving)
+
+
+func SetState(newState)
+  //debug.Log("state = " + state + ", newState = " + newState)
+
+  // Exit state
+  ?state = Menu
+    RemoveMenuUI()
+    
+  // Enter state
+  ?newState = Arriving
+    logo.Reset()
+
+  :?newState = Menu
+    enable pause
+    AddMenuUI()
+    
+  :?newState = Throwing
+    logo.Hide()
+    disable pause
+
+  :?newState = Fail2
+    play error
+
+  :?newState = Success1
+    var doNothing
+
+  :?newState = Success2
+    play pickup_success
+
+  :?newState = Success3
+    x = screen.w / 2 - 27
+    y = screen.h / 2 - 5
+    flyup.Show(x, y, string.Format(te.xt(tid_fish_scales), fish.scales))
+    progress.AddScales(fish.scales)
+
+  state = newState
+  stateTime = 0
+
+
+func Update()
+  disable hud
+  disable player
+
+  import Games/Fishing/FishingHUD
+  import Games/Fishing/FishingLogo
+  import Games/FlyupText
+
+  var rod
+  ?!rod
+    rod = rodFactory.MakeRod(progress.rod)
+
+  stateTime++
+
+
+// TODO - Debug state
+//  >`0,0,State: @state@
+//  >`0,1,STime: @stateTime@
+
+
+  ?state = Arriving
+    ?stateTime = 120
+      logo.Show()
+
+    ?stateTime >= 166 & stateTime < 169
+      >o-5,-1,#ffffff,ascii
+###,
+###!\
+####`O
+####(|\
+asciiend
+      >o-5,-1,@rod.color@,ascii
+###,
+###!\
+####`#
+######\
+asciiend
+      >o-5,-1,@rod.lineColor@,ascii
+#
+###!
+####`
+asciiend
+
+    :?stateTime >= 169 & stateTime < 172
+      >o-5,-1,#ffffff,ascii
+######,
+#####;|
+#####O|
+#####\|
+asciiend
+      >o-5,-1,@rod.color@,ascii
+######,
+#####;|
+######|
+######|
+asciiend
+      >o-5,-1,@rod.lineColor@,ascii
+######,
+#####;
+asciiend
+
+    :?stateTime >= 172
+      >o-5,-1,#ffffff,ascii
+#########,
+########/;
+#####O_/´
+#####\/!
+asciiend
+      >o-5,-1,@rod.color@,ascii
+#########,
+########/;
+#######/´
+######/!
+asciiend
+      >o-5,-1,@rod.lineColor@,ascii
+#
+#########;
+########´
+#######!
+asciiend
+
+    :
+      >o-5,-1,#ffffff,ascii
+#
+#
+#____O__
+`-´"/|´ !
+asciiend
+      >o-5,-1,@rod.color@,ascii
+#
+#
+#____#__
+`-´"### !
+asciiend
+      >o-5,-1,@rod.lineColor@,ascii
+#
+#
+#
+`-´"### !
+asciiend
+
+    // Draw legs
+    ?time % 12 <= 2
+      >o-1,3,
+^/ \
+    :?time % 12 <= 5
+      >o-1,3,
+^ >\
+    :?time % 12 <= 8
+      >o-1,3,
+^ |\
+    :
+      >o-1,3,
+^ |>
+
+    // Draw the big head
+    ?bighead
+      >o-2,-1,ascii
+#.-.
+( '')
+#`·´
+asciiend
+
+    ?stateTime >= 174
+      SetState(Menu)
+
+
+
+  :?state = Menu
+
+    //?key = primaryBegin
+    //  SetState(Throwing)
+    //:?key = ability1Begin
+    //  SetState(Shop)
+
+    // Draw player
+    >o-5,-1,#ffffff,ascii
+#
+#########,
+#####O  /;
+####(|`/´
+####/ /!
+asciiend
+    >o-5,-1,@rod.color@,ascii
+#
+#########,
+########/;
+#######/´
+######/!
+asciiend
+    >o-5,-1,@rod.lineColor@,ascii
+#
+#
+#########;
+########´
+#######!
+asciiend
+
+    ?bighead
+      >o-2,-1,ascii
+#.-.
+(   )
+#`·´
+asciiend
+      ?time % 90 >= 6
+        >o-2,0,
+^('' )
+
+
+
+  :?state = Throwing
+
+    ?key = backBegin
+      SetState(Menu)
+
+    // Draw player
+    ?stateTime < 2
+      >o-5,-1,#ffffff,ascii
+######,
+####,´|
+####`O|
+#####\|`,
+####/ \
+asciiend
+      >o-5,-1,@rod.color@,ascii
+######,
+####,´|
+####`#|
+######|`,
+asciiend
+      >o-5,-1,@rod.lineColor@,ascii
+######
+####,´
+####`
+#######`,
+asciiend
+
+    :?stateTime < 4
+      >o-5,-1,#ffffff,ascii
+#######/)
+######/;
+#####/)'-.
+####`|   '
+####/ \
+asciiend
+      >o-5,-1,@rod.color@,ascii
+#######/)
+######/;
+#####/#'-.
+######   '
+asciiend
+      >o-5,-1,@rod.lineColor@,ascii
+########)
+#######;
+#######'-.
+######   '
+asciiend
+
+    :?stateTime < 6
+      >o-18,-2,#ffffff,ascii
+####################,
+###################/`,
+##################/ (
+################°(O  `-.
+################ `|
+################ / \
+asciiend
+      >o-18,-2,@rod.color@,ascii
+####################,
+###################/`,
+##################/ (
+################°##  `-.
+asciiend
+      >o-18,-2,@rod.lineColor@,ascii
+#
+####################`,
+################### (
+###################  `-.
+asciiend
+
+    :?stateTime < 8
+      >o-18,-2,#ffffff,ascii
+#################,_
+#################| `.
+#################|   \
+################°(O   `.
+################ `|
+################ / \
+asciiend
+      >o-18,-2,@rod.color@,ascii
+#################,_
+#################| `.
+#################|   \
+################°##   `.
+asciiend
+      >o-18,-2,@rod.lineColor@,ascii
+##################_
+################## `.
+##################   \
+###################   `.
+asciiend
+
+    :?stateTime < 10
+      >o-18,-2,#ffffff,ascii
+################,
+################|`-.
+################|   `.
+###############°|\O   `
+###############  `|
+###############  / \
+asciiend
+      >o-18,-2,@rod.color@,ascii
+################,
+################|`-.
+################|   `.
+###############°|##   `
+asciiend
+      >o-18,-2,@rod.lineColor@,ascii
+#
+#################`-.
+#################   `.
+###################   `
+asciiend
+
+    :?stateTime < 12
+      >o-18,-2,#ffffff,ascii
+#
+############.-,--._
+###########'-´#\   `
+################\_O
+################°\/
+################ / \
+asciiend
+      >o-18,-2,@rod.color@,ascii
+#
+############.-,--._
+###########'-´#\   `
+################\
+################°\
+asciiend
+      >o-18,-2,@rod.lineColor@,ascii
+#
+############.-#--._
+###########'-´##   `
+asciiend
+
+    :?stateTime < 14
+      >o-18,-2,#ffffff,ascii
+#
+###########_.-,
+#########,´ .´#\
+#########`-´### \_O
+############### °\/
+###############  / \
+asciiend
+      >o-18,-2,@rod.color@,ascii
+#
+###########_.-,
+#########,´ .´#\
+#########`-´### \
+############### °\
+asciiend
+      >o-18,-2,@rod.lineColor@,ascii
+#
+###########_.-
+#########,´ .´
+#########`-´
+asciiend
+
+    :?stateTime < 16
+      >o-18,-2,#ffffff,ascii
+#
+##############,
+######.'´###.´#\
+#####(___.-´### \_O
+############### °\/
+###############  / \
+asciiend
+      >o-18,-2,@rod.color@,ascii
+#
+##############,
+######.'´###.´#\
+#####(___.-´### \
+############### °\
+asciiend
+      >o-18,-2,@rod.lineColor@,ascii
+#
+#
+######.'´###.´
+#####(___.-´
+asciiend
+
+    :?stateTime < 18
+      >o-18,-2,#ffffff,ascii
+#
+##############,
+############.´ \
+###########/    \_O
+#########.´     °\/
+###,####/        / \
+##(__.-´
+asciiend
+      >o-18,-2,@rod.color@,ascii
+#
+##############,
+############.´ \
+###########/    \
+#########.´     °\
+###,####/
+##(__.-´
+asciiend
+      >o-18,-2,@rod.lineColor@,ascii
+#
+#
+############.´
+###########/
+#########.´
+###,####/
+##(__.-´
+asciiend
+
+    :
+      >o-18,-2,#ffffff,ascii
+#
+##############,
+############.´ \
+###########/    \_O
+#########.´     °\/
+########/        / \
+######.´
+#####/
+###.´
+##/
+,´__ _
+asciiend
+      >o-18,-2,#bbbbbb,ascii
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+##__ _
+asciiend
+      >o-18,-2,@rod.color@,ascii
+#
+##############,
+############.´ \
+###########/    \
+#########.´     °\
+########/
+######.´
+#####/
+###.´
+##/
+,´
+asciiend
+      >o-18,-2,@rod.lineColor@,ascii
+#
+#
+############.´
+###########/
+#########.´
+########/
+######.´
+#####/
+###.´
+##/
+,´
+asciiend
+
+      SetState(Waiting)
+
+    ?stateTime = 5
+      play grappling_idle
+    ?stateTime = 13
+      play cross_deadwood_row
+
+    ?bighead
+      >o-2,-1,ascii
+#.-.
+('' )
+#`·´
+asciiend
+
+
+
+  :?state = Waiting
+
+    ?key = backBegin
+      SetState(Menu)
+      logo.Show()
+
+    :?stateTime >= waitTimeMin
+      SetState(Catching)
+
+      play haunted_gate_shuffle_fast
+
+      // Reset progress bar
+      progressValue = fishArea * 3 / 5
+
+      // Reset fish
+      fishPos = fishLimit / 2
+      fishSpeed = 0
+      fishAccel = fishAccelMin
+
+      fish = fishFactory.MakeFish(rod.minFish, rod.maxFish)
+      isRecordWeight = progress.CheckRecord(fish.scales)
+
+
+    >o-18,-2,#ffffff,ascii
+#
+##############,
+############.´ \
+###########/    \_O
+#########.´     °\/
+########/        / \
+######.´
+#####/
+###.´
+##/
+,´__ _
+asciiend
+    >o-18,-2,#bbbbbb,ascii
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+##__ _
+asciiend
+    >o-18,-2,@rod.color@,ascii
+#
+##############,
+############.´ \
+###########/    \
+#########.´     °\
+########/
+######.´
+#####/
+###.´
+##/
+,´
+asciiend
+    >o-18,-2,@rod.lineColor@,ascii
+#
+#
+############.´
+###########/
+#########.´
+########/
+######.´
+#####/
+###.´
+##/
+,´
+asciiend
+
+    ?bighead
+      >o-2,-1,ascii
+#.-.
+(   )
+#`·´
+asciiend
+      ?time % 90 >= 6
+        >o-2,0,
+^('' )
+
+
+
+
+  :?state = Catching
+
+// TODO - For debug only
+    //?key = backBegin
+    //  SetState(Menu)
+    //:?key = ability1Begin
+    //  SetState(Success1)
+
+    // Draw player
+    ?key = primary
+      >o-18,-2,#ffffff,ascii
+################,
+##############.´|
+#############/  |
+############/  °|\O
+##########.´     `|
+#########/       / \
+########/
+######.´
+#####/
+####/
+##,´__ _
+asciiend
+      >o-18,-2,#bbbbbb,ascii
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+####__ _
+asciiend
+      >o-18,-2,@rod.color@,ascii
+################,
+##############.´|
+#############/  |
+############/  °|
+##########.´
+#########/
+########/
+######.´
+#####/
+####/
+##,´
+asciiend
+      >o-18,-2,@rod.lineColor@,ascii
+#
+##############.´
+#############/
+############/
+##########.´
+#########/
+########/
+######.´
+#####/
+####/
+##,´
+asciiend
+  
+    :
+      >o-18,-2,#ffffff,ascii
+#
+##############,
+############.´ \
+###########/    \_O
+#########.´     °\/
+########/        / \
+######.´
+#####/
+###.´
+##/
+,´__ _
+asciiend
+      >o-18,-2,#bbbbbb,ascii
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+##__ _
+asciiend
+      >o-18,-2,@rod.color@,ascii
+#
+##############,
+############.´ \
+###########/    \
+#########.´     °\
+########/
+######.´
+#####/
+###.´
+##/
+,´
+asciiend
+      >o-18,-2,@rod.lineColor@,ascii
+#
+#
+############.´
+###########/
+#########.´
+########/
+######.´
+#####/
+###.´
+##/
+,´
+asciiend
+
+    ?bighead
+      >o-2,-1,ascii
+#.-.
+(   )
+#`·´
+asciiend
+      ?time % 90 >= 6
+        >o-2,0,
+^('' )
+
+    // Control the fishing rod
+    ?key = primaryBegin
+      fishSpeed = fishSpeed + reelImpulse
+      hasPulled = true
+
+    isFtue = (progress.scales = 0 & !hasPulled)
+
+    // If FTUE then don't pull the fish at the start
+    ?!isFtue
+      // Apply force of fish pulling away
+      fishSpeed = fishSpeed - fishAccel
+
+      // Simulate
+      fishPos = fishPos + fishSpeed
+      ?fishAccel < fishAccelMax & stateTime % fishAccelDelay = 0
+        fishAccel++
+
+    // Constrain speed
+    ?fishSpeed > fishMaxSpeed
+      fishSpeed = fishMaxSpeed
+    :?fishSpeed < fishMinSpeed
+      fishSpeed = fishMinSpeed
+
+    // Constrain position
+    ?fishPos > fishLimit
+      fishPos = fishLimit
+    :?fishPos < 0
+      fishPos = 0
+
+    // Update progress
+    ?fishPos < reelBadLow | fishPos > reelBadHigh
+      progressColor = ff0000
+      progressValue = progressValue - progressNegative
+
+    :?fishPos >= reelGoodLow & fishPos <= reelGoodHigh
+      progressColor = ffffff
+      ?!isFtue
+        progressValue = progressValue + progressPositive
+    :
+      progressColor = bbbbbb
+
+    ?progressValue > fishArea
+      // Victory condition
+      SetState(Success1)
+    :?progressValue < 0
+      // Failure condition
+      SetState(Fail1)
+
+
+    // Draw
+
+    >c@uiX@,@uiY@,@barColor@,ascii
+┌───────────────────────┐
+│                       │
+├───────────────────────┤
+│                       │
+└───┴───┴───┴───┴───┴───┘
+asciiend
+    
+    >c@uiX@,@uiY@,#888888,
+    ^#######───────────\n
+    ^\n
+    ^#######───────────
+    >c@uiX@,@uiY@,#ffffff,
+    ^#########───────\n
+    ^\n
+    ^#########───────
+
+    // Draw fish
+    fishDrawX = uiX + 1 + fishPos / 100
+    >c@fishDrawX@,@fishDrawY@,@fish.color@,<°((><
+
+    // Draw progress bar
+    var progressBar = ███████
+    ?progressValue <= 100
+      progressBar = █
+    :?progressValue <= 200
+      progressBar = ██
+    :?progressValue <= 300
+      progressBar = ███
+    :?progressValue <= 400
+      progressBar = ████
+    :?progressValue <= 500
+      progressBar = █████
+    :?progressValue <= 600
+      progressBar = ██████
+    :?progressValue <= 700
+      progressBar = ███████
+    :?progressValue <= 800
+      progressBar = ████████
+    :?progressValue <= 900
+      progressBar = █████████
+    :?progressValue <= 1000
+      progressBar = ██████████
+    :?progressValue <= 1100
+      progressBar = ███████████
+    :?progressValue <= 1200
+      progressBar = ████████████
+    :?progressValue <= 1300
+      progressBar = █████████████
+    :?progressValue <= 1400
+      progressBar = ██████████████
+    :?progressValue <= 1500
+      progressBar = ███████████████
+    :?progressValue <= 1600
+      progressBar = ████████████████
+    :?progressValue <= 1700
+      progressBar = █████████████████
+    :?progressValue <= 1800
+      progressBar = ██████████████████
+    :?progressValue <= 1900
+      progressBar = ███████████████████
+    :?progressValue <= 2000
+      progressBar = ████████████████████
+    :?progressValue <= 2100
+      progressBar = █████████████████████
+    :?progressValue <= 2200
+      progressBar = ██████████████████████
+    :?progressValue <= 2300
+      progressBar = ███████████████████████
+    >c@progressX@,@progressY@,#@progressColor@,@progressBar@
+    
+    // Draw FTUE
+    ?progress.scales = 0
+      ?hasPulled
+        var ftueMessage = te.xt("tid_fish_ftue_2") + "\n" + te.xt("tid_fish_ftue_3")
+        >c@uiX - 3@,@uiY - 3@,@ftueMessage@
+        >c@uiX + 12@,@uiY - 1@,↓
+      :?time % 18 < 9
+        var ftueMessage = te.xt("tid_fish_ftue_1")
+        >c@uiX + 12 - string.Size(ftueMessage)/2@,@uiY - 1@,@ftueMessage@
+
+  :?state = Fail1
+    ?stateTime >= 15
+      SetState(Fail2)
+
+    // Draw player
+    >o-18,-2,#ffffff,ascii
+################,
+##############.´|
+#############/  |
+############/  °|\O
+##########.´     `|
+#########/       / \
+########/
+######.´
+#####/
+####/
+##,´__ _
+asciiend
+    >o-18,-2,#bbbbbb,ascii
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+####__ _
+asciiend
+    >o-18,-2,@rod.color@,ascii
+################,
+##############.´|
+#############/  |
+############/  °|
+##########.´
+#########/
+########/
+######.´
+#####/
+####/
+##,´
+asciiend
+    >o-18,-2,@rod.lineColor@,ascii
+#
+##############.´
+#############/
+############/
+##########.´
+#########/
+########/
+######.´
+#####/
+####/
+##,´
+asciiend
+
+    ?bighead
+      >o-2,-1,ascii
+#.-.
+(--')
+#`·´
+asciiend
+
+  :?state = Fail2
+    ?key = primaryBegin & stateTime > 1
+      SetState(Menu)
+      logo.Show()
+
+    // Draw player
+    >o-14,-2,#ffffff,ascii
+#############__
+##########.´  /
+#########/  ./  !
+,-.#####/   /(O
+###`._.´     `|
+####         / \
+asciiend
+    >o-14,-2,@rod.color@,ascii
+#############__
+##########.´  /
+#########/  ./
+,-.#####/   /
+###`._.´
+asciiend
+    >o-14,-2,@rod.lineColor@,ascii
+#############__
+##########.´
+#########/
+,-.#####/
+###`._.´
+asciiend
+
+    ?bighead
+      >o-2,-1,ascii
+#.-.
+(TT )
+#`·´
+asciiend
+
+    // Failure message
+    ?fishPos < fishLimit / 2
+      >o-4,-4,@te.xt(tid_fish_got_away)@
+    :
+      >o-4,-4,@te.xt(tid_fish_line_snapped)@
+
+
+  :?state = Success1
+    ?stateTime >= 30
+      SetState(Success2)
+
+    // Draw player
+    >o-18,-2,#ffffff,ascii
+################,
+##############.´|
+#############/  |
+############/  °|\O
+##########.´     `|
+#########/       / \
+########/
+######.´
+#####/
+####/
+##,´__ _
+asciiend
+    >o-18,-2,#bbbbbb,ascii
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+####__ _
+asciiend
+    >o-18,-2,@rod.color@,ascii
+################,
+##############.´|
+#############/  |
+############/  °|
+##########.´
+#########/
+########/
+######.´
+#####/
+####/
+##,´
+asciiend
+    >o-18,-2,@rod.lineColor@,ascii
+#
+##############.´
+#############/
+############/
+##########.´
+#########/
+########/
+######.´
+#####/
+####/
+##,´
+asciiend
+
+    ?bighead
+      >o-2,-1,ascii
+#.-.
+(--')
+#`·´
+asciiend
+
+
+  :?state = Success2
+    ?stateTime >= 45
+      SetState(Success3)
+
+    // Draw player
+    >o-15,-2,#ffffff,ascii
+##############__
+###########.´  /
+##########/  ./  !
+#,-.#####/   /(O
+´###`._.´     `|
+#####         / \
+asciiend
+    >o-15,-2,@rod.color@,ascii
+##############__
+###########.´  /
+##########/  ./
+#,-.#####/   /
+´###`._.´
+asciiend
+    >o-15,-2,@rod.lineColor@,ascii
+##############__
+###########.´
+##########/
+#,-.#####/
+´###`._.´
+asciiend
+
+    ?bighead
+      >o-2,-1,ascii
+#.-.
+(^^ )
+#`·´
+asciiend
+
+    // Draw the fish
+    fish.DrawO(-15, 1)
+
+
+  :?state = Success3
+    ?key = primaryBegin & stateTime > 1
+      SetState(Menu)
+      logo.Show()
+
+    // Draw player
+    >o-15,-2,#ffffff,ascii
+##############__
+###########.´  /
+##########/  ./  !
+#,-.#####/   /(O
+´###`._.´     `|
+#####         / \
+asciiend
+    >o-15,-2,@rod.color@,ascii
+##############__
+###########.´  /
+##########/  ./
+#,-.#####/   /
+´###`._.´
+asciiend
+    >o-15,-2,@rod.lineColor@,ascii
+##############__
+###########.´
+##########/
+#,-.#####/
+´###`._.´
+asciiend
+
+    ?bighead
+      >o-2,-1,ascii
+#.-.
+(^^ )
+#`·´
+asciiend
+
+    // Draw the fish
+    fish.DrawO(-15, 1)
+
+    // Draw result window
+    ?isFishStatsDialogEnabled
+      x = screen.w - 27
+      y = screen.h / 2 - 8
+      >`@x@,@y@,#666666,ascii
+#########/\
+#_#######\/#######_
+(______/\/\/\______)
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#______      ______#
+(_#####\/\/\/#####_)
+#########/\
+#########\/
+asciiend
+
+      x = x + 10
+      y = y + 4
+      >`@x - string.Size(fish.name) / 2@,@y@,@fish.name@
+
+      x = x - 4
+      y = y + 2
+      fish.Draw(x, y)
+
+      x = x - 4
+      y = y + 4
+      >`@x@,@y@,@string.Format(te.xt(tid_fish_ui_weight), fish.weight)@
+
+      ?isRecordWeight
+        y++
+        >`@x@,@y@,@te.xt(tid_fish_ui_record)@
+
+  :?state = Shop
+    ?key = backBegin
+      SetState(Menu)
+    :
+      shop.Update()
+
+func GetState()
+  return state

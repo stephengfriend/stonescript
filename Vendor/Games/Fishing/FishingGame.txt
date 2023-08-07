@@ -1,0 +1,1322 @@
+
+// Deadwood Fishing
+// by: standardcombo
+var version = "0.7.0"
+
+var x = 0
+var y = 0
+var s = ""
+
+var uiX = -11
+var uiY = 7
+var barColor = #303030
+var progressValue = 1000
+var progressPositive = 7
+var progressNegative = 14
+var progressX = uiX + 1
+var progressY = uiY + 3
+var progressColor = 00ff00
+var hasPulled = false
+var isFtue = false
+
+var fishWidth = 600
+var fishArea = 2300
+var fishLimit = fishArea - fishWidth
+var fishMinSpeed = -70
+var fishMaxSpeed = 100
+var fishAccelMin = 5
+var fishAccelMax = 25
+var fishAccelDelay = 30
+var reelImpulse = 180
+var reelBadLow = 200
+var reelGoodLow = 600
+var reelGoodHigh = 1200
+var reelBadHigh = 1600
+
+var catchingPanel = null
+var catchingFrame = null
+var catchingZoneOutside = null
+var catchingZoneInside = null
+var catchingBar = null
+var catchingFish = null
+var catchingFtueText = null
+
+var horizontalBarsStyle = ui.AddStyle("
+^───
+^###
+^───")
+var fullBoxStyle = ui.AddStyle("
+^███
+^███
+^███")
+
+var playerAnimBigHead = null
+var playerAnimCatchingRoot = null
+var playerAnimCatching1 = null
+var playerAnimCatching2 = null
+var playerAnimCatching3 = null
+var playerAnimCatching4 = null
+
+var fishPos = 0
+var fishSpeed = 0
+var fishAccel = 0
+var fishDrawX = 0
+var fishDrawY = uiY + 1
+var fish
+
+var isFishStatsDialogEnabled = true
+var isRecordWeight = false
+
+var waitTimeMin = 30 * 2
+var waitTimeMax = 30 * 10
+
+var progress = import Games/Fishing/FishingProgress
+var shop = import Games/Fishing/FishingShop
+var logo = import Games/Fishing/FishingLogo
+logo.version = version
+
+var fishFactory = import Games/Fishing/FishFactory
+var rodFactory = import Games/Fishing/RodFactory
+var flyup = import Games/FlyupText
+
+// States:
+// - Arriving
+// - Menu
+// - Throwing
+// - Waiting
+// - Catching
+// - Fail1
+// - Fail2
+// - Success1
+// - Success2
+// - Success3
+// - Collection
+// - Shop
+
+var state = null
+var stateTime = 0
+var currentStateFunction = null
+
+var playButton = null
+func AddMenuUI()
+  ?playButton = null
+    var button = ui.AddButton()
+    button.anchor = top_right
+    button.dock = top_right
+    button.x = -13
+    button.y = 13
+    button.text = te.xt(Play)
+    button.SetPressed(OnPlayPressed)
+    playButton = button
+
+func RemoveMenuUI()
+  ?playButton ! null
+    playButton.Recycle()
+  playButton = null
+
+
+func AddCatchingUI()
+  // Base panel
+  catchingPanel = ui.AddPanel()
+  catchingPanel.y = -1
+  catchingPanel.w = 25
+  catchingPanel.h = 5
+  catchingPanel.ay = bottom
+  catchingPanel.dy = bottom
+
+  // The visual design of the panel
+  catchingFrame = ui.AddAnim(ascii
+┌───────────────────────┐
+│                       │
+├───────────────────────┤
+│                       │
+└───┴───┴───┴───┴───┴───┘
+asciiend)
+  catchingPanel.Add(catchingFrame)
+  catchingFrame.color = barColor
+
+  // The grey sections above and below the fish, indicating valid zone
+  catchingZoneOutside = ui.AddPanel()
+  catchingPanel.Add(catchingZoneOutside)
+  catchingZoneOutside.style = horizontalBarsStyle
+  catchingZoneOutside.w = 11
+  catchingZoneOutside.h = 3
+  catchingZoneOutside.ay = top
+  catchingZoneOutside.dy = top
+  catchingZoneOutside.color = #888888
+  catchingZoneInside = ui.AddPanel()
+  catchingPanel.Add(catchingZoneInside)
+  catchingZoneInside.style = horizontalBarsStyle
+  catchingZoneInside.w = 7
+  catchingZoneInside.h = 3
+  catchingZoneInside.ay = top
+  catchingZoneInside.dy = top
+
+  // The progress bar inside the panel
+  catchingBar = ui.AddPanel()
+  catchingPanel.Add(catchingBar)
+  catchingBar.style = fullBoxStyle
+  catchingBar.x = 1
+  catchingBar.y = 3
+  catchingBar.w = 12
+  catchingBar.h = 1
+  catchingBar.anchor = top_left
+  catchingBar.dock = top_left
+
+  // Fish sprite inside panel
+  catchingFish = ui.AddAnim(ascii
+<°((><
+asciiend)
+  catchingPanel.Add(catchingFish)
+  catchingFish.x = 12
+  catchingFish.y = 1
+  catchingFish.ax = left
+  catchingFish.dock = top_left
+
+  // FTUE texts
+  ?progress.scales = 0
+    var msg = te.xt("tid_fish_ftue_1")
+    catchingFtueText = ui.AddText(msg)
+    catchingPanel.Add(catchingFtueText)
+    catchingFtueText.y = -2
+    catchingFtueText.w = 69
+    catchingFtueText.h = 1
+    catchingFtueText.ay = bottom
+    catchingFtueText.align = center
+
+func RemoveCatchingUI()
+  catchingPanel.Recycle()
+  catchingFtueText = null
+  
+
+func OnPlayPressed()
+  SetState(Throwing)
+
+
+func Reset()
+  RemoveMenuUI()
+  SetState(Arriving)
+
+
+func SetState(newState)
+  //debug.Log("state = " + state + ", newState = " + newState)
+
+  // Exit state
+
+  ?state = Menu
+    RemoveMenuUI()
+  
+  :?state = Catching
+    RemoveCatchingUI()
+    playerAnimCatchingRoot.Recycle()
+  
+
+  // Enter state
+
+  ?newState = Arriving
+    currentStateFunction = UpdateStateArriving
+    logo.Reset()
+
+  :?newState = Menu
+    currentStateFunction = UpdateStateMenu
+    enable pause
+    AddMenuUI()
+    
+  :?newState = Throwing
+    currentStateFunction = UpdateStateThrowing
+    logo.Hide()
+    disable pause
+
+  :?newState = Waiting
+    currentStateFunction = UpdateStateWaiting
+
+  :?newState = Catching
+    currentStateFunction = UpdateStateCatching
+    AddPlayerAnimCatching()
+    ?bighead
+      AddPlayerAnimBigHead(playerAnimCatchingRoot)
+    AddCatchingUI()
+  
+  :?newState = Fail1
+    currentStateFunction = UpdateStateFail1
+
+  :?newState = Fail2
+    currentStateFunction = UpdateStateFail2
+    play error
+
+  :?newState = Success1
+    currentStateFunction = UpdateStateSuccess1
+    var doNothing
+
+  :?newState = Success2
+    currentStateFunction = UpdateStateSuccess2
+    play pickup_success
+
+  :?newState = Success3
+    currentStateFunction = UpdateStateSuccess3
+    x = screen.w / 2 - 27
+    y = screen.h / 2 - 5
+    flyup.Show(x, y, string.Format(te.xt(tid_fish_scales), fish.scales))
+    progress.AddScales(fish.scales)
+
+  :?newState = Shop
+    currentStateFunction = UpdateStateShop
+
+  state = newState
+  stateTime = 0
+
+
+var rod
+
+func Init()
+  ?!rod
+    rod = rodFactory.MakeRod(progress.rod)
+
+    disable hud
+    disable player
+
+    SetState(Arriving)
+
+
+func UpdateStateCatching()
+
+// TODO - For debug only
+    //?key = backBegin
+    //  SetState(Menu)
+    //:?key = ability1Begin
+    //  SetState(Success1)
+
+    // Draw player
+    ?key = primary
+      playerAnimCatching1.frame = 1
+      playerAnimCatching2.frame = 1
+      playerAnimCatching3.frame = 1
+      playerAnimCatching4.frame = 1
+    :
+      playerAnimCatching1.frame = 0
+      playerAnimCatching2.frame = 0
+      playerAnimCatching3.frame = 0
+      playerAnimCatching4.frame = 0
+
+    // Control the fishing rod
+    ?key = primaryBegin
+      fishSpeed = fishSpeed + reelImpulse
+      hasPulled = true
+
+      ?catchingFtueText & catchingFtueText.h = 1
+        var msg = te.xt("tid_fish_ftue_2") + "\n" + te.xt("tid_fish_ftue_3") + "\n" + " ↓ "
+        catchingFtueText.text = msg
+        catchingFtueText.h = 3
+
+    isFtue = (progress.scales = 0 & !hasPulled)
+
+    // If FTUE then don't pull the fish at the start
+    ?!isFtue
+      // Apply force of fish pulling away
+      fishSpeed -= fishAccel
+
+      // Simulate
+      fishPos += fishSpeed
+      ?fishAccel < fishAccelMax & stateTime % fishAccelDelay = 0
+        fishAccel++
+
+    // Constrain speed
+    fishSpeed = math.Clamp(fishSpeed, fishMinSpeed, fishMaxSpeed)
+
+    // Constrain position
+    fishPos = math.Clamp(fishPos, 0, fishLimit)
+
+    // Update progress
+    ?fishPos < reelBadLow | fishPos > reelBadHigh
+      catchingBar.color = #ff0000
+      progressValue -= progressNegative
+
+    :?fishPos >= reelGoodLow & fishPos <= reelGoodHigh
+      catchingBar.color = #ffffff
+      ?!isFtue
+        progressValue += progressPositive
+    :
+      catchingBar.color = #bbbbbb
+
+    ?progressValue > fishArea
+      // Victory condition
+      SetState(Success1)
+    :?progressValue < 0
+      // Failure condition
+      SetState(Fail1)
+
+    // Draw
+    catchingBar.w = math.CeilToInt(progressValue / 100.0)
+    catchingFish.x = 1 + fishPos / 100
+
+    // Blink FTUE text
+    ?catchingFtueText
+      ?hasPulled | time % 18 < 9
+        catchingFtueText.visible = true
+      :
+        catchingFtueText.visible = false
+
+
+func UpdateStateArriving()
+    ?stateTime = 120
+      logo.Show()
+
+    ?stateTime >= 166 & stateTime < 169
+      >o-5,-1,#ffffff,ascii
+###,
+###!\
+####`O
+####(|\
+asciiend
+      >o-5,-1,@rod.color@,ascii
+###,
+###!\
+####`#
+######\
+asciiend
+      >o-5,-1,@rod.lineColor@,ascii
+#
+###!
+####`
+asciiend
+
+    :?stateTime >= 169 & stateTime < 172
+      >o-5,-1,#ffffff,ascii
+######,
+#####;|
+#####O|
+#####\|
+asciiend
+      >o-5,-1,@rod.color@,ascii
+######,
+#####;|
+######|
+######|
+asciiend
+      >o-5,-1,@rod.lineColor@,ascii
+######,
+#####;
+asciiend
+
+    :?stateTime >= 172
+      >o-5,-1,#ffffff,ascii
+#########,
+########/;
+#####O_/´
+#####\/!
+asciiend
+      >o-5,-1,@rod.color@,ascii
+#########,
+########/;
+#######/´
+######/!
+asciiend
+      >o-5,-1,@rod.lineColor@,ascii
+#
+#########;
+########´
+#######!
+asciiend
+
+    :
+      >o-5,-1,#ffffff,ascii
+#
+#
+#____O__
+`-´"/|´ !
+asciiend
+      >o-5,-1,@rod.color@,ascii
+#
+#
+#____#__
+`-´"### !
+asciiend
+      >o-5,-1,@rod.lineColor@,ascii
+#
+#
+#
+`-´"### !
+asciiend
+
+    // Draw legs
+    ?time % 12 <= 2
+      >o-1,3,
+^/ \
+    :?time % 12 <= 5
+      >o-1,3,
+^ >\
+    :?time % 12 <= 8
+      >o-1,3,
+^ |\
+    :
+      >o-1,3,
+^ |>
+
+    // Draw the big head
+    ?bighead
+      >o-2,-1,ascii
+#.-.
+( '')
+#`·´
+asciiend
+
+    ?stateTime >= 174
+      SetState(Menu)
+
+
+func UpdateStateThrowing()
+
+    ?key = backBegin
+      SetState(Menu)
+
+    // Draw player
+    ?stateTime < 2
+      >o-5,-1,#ffffff,ascii
+######,
+####,´|
+####`O|
+#####\|`,
+####/ \
+asciiend
+      >o-5,-1,@rod.color@,ascii
+######,
+####,´|
+####`#|
+######|`,
+asciiend
+      >o-5,-1,@rod.lineColor@,ascii
+######
+####,´
+####`
+#######`,
+asciiend
+
+    :?stateTime < 4
+      >o-5,-1,#ffffff,ascii
+#######/)
+######/;
+#####/)'-.
+####`|   '
+####/ \
+asciiend
+      >o-5,-1,@rod.color@,ascii
+#######/)
+######/;
+#####/#'-.
+######   '
+asciiend
+      >o-5,-1,@rod.lineColor@,ascii
+########)
+#######;
+#######'-.
+######   '
+asciiend
+
+    :?stateTime < 6
+      >o-18,-2,#ffffff,ascii
+####################,
+###################/`,
+##################/ (
+################°(O  `-.
+################ `|
+################ / \
+asciiend
+      >o-18,-2,@rod.color@,ascii
+####################,
+###################/`,
+##################/ (
+################°##  `-.
+asciiend
+      >o-18,-2,@rod.lineColor@,ascii
+#
+####################`,
+################### (
+###################  `-.
+asciiend
+
+    :?stateTime < 8
+      >o-18,-2,#ffffff,ascii
+#################,_
+#################| `.
+#################|   \
+################°(O   `.
+################ `|
+################ / \
+asciiend
+      >o-18,-2,@rod.color@,ascii
+#################,_
+#################| `.
+#################|   \
+################°##   `.
+asciiend
+      >o-18,-2,@rod.lineColor@,ascii
+##################_
+################## `.
+##################   \
+###################   `.
+asciiend
+
+    :?stateTime < 10
+      >o-18,-2,#ffffff,ascii
+################,
+################|`-.
+################|   `.
+###############°|\O   `
+###############  `|
+###############  / \
+asciiend
+      >o-18,-2,@rod.color@,ascii
+################,
+################|`-.
+################|   `.
+###############°|##   `
+asciiend
+      >o-18,-2,@rod.lineColor@,ascii
+#
+#################`-.
+#################   `.
+###################   `
+asciiend
+
+    :?stateTime < 12
+      >o-18,-2,#ffffff,ascii
+#
+############.-,--._
+###########'-´#\   `
+################\_O
+################°\/
+################ / \
+asciiend
+      >o-18,-2,@rod.color@,ascii
+#
+############.-,--._
+###########'-´#\   `
+################\
+################°\
+asciiend
+      >o-18,-2,@rod.lineColor@,ascii
+#
+############.-#--._
+###########'-´##   `
+asciiend
+
+    :?stateTime < 14
+      >o-18,-2,#ffffff,ascii
+#
+###########_.-,
+#########,´ .´#\
+#########`-´### \_O
+############### °\/
+###############  / \
+asciiend
+      >o-18,-2,@rod.color@,ascii
+#
+###########_.-,
+#########,´ .´#\
+#########`-´### \
+############### °\
+asciiend
+      >o-18,-2,@rod.lineColor@,ascii
+#
+###########_.-
+#########,´ .´
+#########`-´
+asciiend
+
+    :?stateTime < 16
+      >o-18,-2,#ffffff,ascii
+#
+##############,
+######.'´###.´#\
+#####(___.-´### \_O
+############### °\/
+###############  / \
+asciiend
+      >o-18,-2,@rod.color@,ascii
+#
+##############,
+######.'´###.´#\
+#####(___.-´### \
+############### °\
+asciiend
+      >o-18,-2,@rod.lineColor@,ascii
+#
+#
+######.'´###.´
+#####(___.-´
+asciiend
+
+    :?stateTime < 18
+      >o-18,-2,#ffffff,ascii
+#
+##############,
+############.´ \
+###########/    \_O
+#########.´     °\/
+###,####/        / \
+##(__.-´
+asciiend
+      >o-18,-2,@rod.color@,ascii
+#
+##############,
+############.´ \
+###########/    \
+#########.´     °\
+###,####/
+##(__.-´
+asciiend
+      >o-18,-2,@rod.lineColor@,ascii
+#
+#
+############.´
+###########/
+#########.´
+###,####/
+##(__.-´
+asciiend
+
+    :
+      >o-18,-2,#ffffff,ascii
+#
+##############,
+############.´ \
+###########/    \_O
+#########.´     °\/
+########/        / \
+######.´
+#####/
+###.´
+##/
+,´__ _
+asciiend
+      >o-18,-2,#bbbbbb,ascii
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+##__ _
+asciiend
+      >o-18,-2,@rod.color@,ascii
+#
+##############,
+############.´ \
+###########/    \
+#########.´     °\
+########/
+######.´
+#####/
+###.´
+##/
+,´
+asciiend
+      >o-18,-2,@rod.lineColor@,ascii
+#
+#
+############.´
+###########/
+#########.´
+########/
+######.´
+#####/
+###.´
+##/
+,´
+asciiend
+
+      SetState(Waiting)
+
+    ?stateTime = 5
+      play grappling_idle
+    ?stateTime = 13
+      play cross_deadwood_row
+
+    ?bighead
+      >o-2,-1,ascii
+#.-.
+('' )
+#`·´
+asciiend
+
+
+func UpdateStateWaiting()
+
+    ?key = backBegin
+      SetState(Menu)
+      logo.Show()
+
+    :?stateTime >= waitTimeMin
+      SetState(Catching)
+
+      play haunted_gate_shuffle_fast
+
+      // Reset progress bar
+      progressValue = fishArea * 3 / 5
+
+      // Reset fish
+      fishPos = fishLimit / 2
+      fishSpeed = 0
+      fishAccel = fishAccelMin
+
+      fish = fishFactory.MakeFish(rod.minFish, rod.maxFish)
+      catchingFish.color = fish.color
+      isRecordWeight = progress.CheckRecord(fish.scales)
+
+
+    >o-18,-2,#ffffff,ascii
+#
+##############,
+############.´ \
+###########/    \_O
+#########.´     °\/
+########/        / \
+######.´
+#####/
+###.´
+##/
+,´__ _
+asciiend
+    >o-18,-2,#bbbbbb,ascii
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+##__ _
+asciiend
+    >o-18,-2,@rod.color@,ascii
+#
+##############,
+############.´ \
+###########/    \
+#########.´     °\
+########/
+######.´
+#####/
+###.´
+##/
+,´
+asciiend
+    >o-18,-2,@rod.lineColor@,ascii
+#
+#
+############.´
+###########/
+#########.´
+########/
+######.´
+#####/
+###.´
+##/
+,´
+asciiend
+
+    ?bighead
+      >o-2,-1,ascii
+#.-.
+(   )
+#`·´
+asciiend
+      ?time % 90 >= 6
+        >o-2,0,
+^('' )
+
+
+func UpdateStateFail1()
+    ?stateTime >= 15
+      SetState(Fail2)
+
+    // Draw player
+    >o-18,-2,#ffffff,ascii
+################,
+##############.´|
+#############/  |
+############/  °|\O
+##########.´     `|
+#########/       / \
+########/
+######.´
+#####/
+####/
+##,´__ _
+asciiend
+    >o-18,-2,#bbbbbb,ascii
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+####__ _
+asciiend
+    >o-18,-2,@rod.color@,ascii
+################,
+##############.´|
+#############/  |
+############/  °|
+##########.´
+#########/
+########/
+######.´
+#####/
+####/
+##,´
+asciiend
+    >o-18,-2,@rod.lineColor@,ascii
+#
+##############.´
+#############/
+############/
+##########.´
+#########/
+########/
+######.´
+#####/
+####/
+##,´
+asciiend
+
+    ?bighead
+      >o-2,-1,ascii
+#.-.
+(--')
+#`·´
+asciiend
+
+
+func UpdateStateFail2()
+    ?key = primaryBegin & stateTime > 1
+      SetState(Menu)
+      logo.Show()
+
+    // Draw player
+    >o-14,-2,#ffffff,ascii
+#############__
+##########.´  /
+#########/  ./  !
+,-.#####/   /(O
+###`._.´     `|
+####         / \
+asciiend
+    >o-14,-2,@rod.color@,ascii
+#############__
+##########.´  /
+#########/  ./
+,-.#####/   /
+###`._.´
+asciiend
+    >o-14,-2,@rod.lineColor@,ascii
+#############__
+##########.´
+#########/
+,-.#####/
+###`._.´
+asciiend
+
+    ?bighead
+      >o-2,-1,ascii
+#.-.
+(TT )
+#`·´
+asciiend
+
+    // Failure message
+    ?fishPos < fishLimit / 2
+      >o-4,-4,@te.xt(tid_fish_got_away)@
+    :
+      >o-4,-4,@te.xt(tid_fish_line_snapped)@
+
+
+func UpdateStateSuccess1()
+    ?stateTime >= 30
+      SetState(Success2)
+
+    // Draw player
+    >o-18,-2,#ffffff,ascii
+################,
+##############.´|
+#############/  |
+############/  °|\O
+##########.´     `|
+#########/       / \
+########/
+######.´
+#####/
+####/
+##,´__ _
+asciiend
+    >o-18,-2,#bbbbbb,ascii
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+####__ _
+asciiend
+    >o-18,-2,@rod.color@,ascii
+################,
+##############.´|
+#############/  |
+############/  °|
+##########.´
+#########/
+########/
+######.´
+#####/
+####/
+##,´
+asciiend
+    >o-18,-2,@rod.lineColor@,ascii
+#
+##############.´
+#############/
+############/
+##########.´
+#########/
+########/
+######.´
+#####/
+####/
+##,´
+asciiend
+
+    ?bighead
+      >o-2,-1,ascii
+#.-.
+(--')
+#`·´
+asciiend
+
+
+func UpdateStateSuccess2()
+    ?stateTime >= 45
+      SetState(Success3)
+
+    // Draw player
+    >o-15,-2,#ffffff,ascii
+##############__
+###########.´  /
+##########/  ./  !
+#,-.#####/   /(O
+´###`._.´     `|
+#####         / \
+asciiend
+    >o-15,-2,@rod.color@,ascii
+##############__
+###########.´  /
+##########/  ./
+#,-.#####/   /
+´###`._.´
+asciiend
+    >o-15,-2,@rod.lineColor@,ascii
+##############__
+###########.´
+##########/
+#,-.#####/
+´###`._.´
+asciiend
+
+    ?bighead
+      >o-2,-1,ascii
+#.-.
+(^^ )
+#`·´
+asciiend
+
+    // Draw the fish
+    fish.DrawO(-15, 1)
+
+
+func UpdateStateSuccess3()
+    ?key = primaryBegin & stateTime > 1
+      SetState(Menu)
+      logo.Show()
+
+    // Draw player
+    >o-15,-2,#ffffff,ascii
+##############__
+###########.´  /
+##########/  ./  !
+#,-.#####/   /(O
+´###`._.´     `|
+#####         / \
+asciiend
+    >o-15,-2,@rod.color@,ascii
+##############__
+###########.´  /
+##########/  ./
+#,-.#####/   /
+´###`._.´
+asciiend
+    >o-15,-2,@rod.lineColor@,ascii
+##############__
+###########.´
+##########/
+#,-.#####/
+´###`._.´
+asciiend
+
+    ?bighead
+      >o-2,-1,ascii
+#.-.
+(^^ )
+#`·´
+asciiend
+
+    // Draw the fish
+    fish.DrawO(-15, 1)
+
+    // Draw result window
+    ?isFishStatsDialogEnabled
+      x = screen.w - 27
+      y = screen.h / 2 - 8
+      >`@x@,@y@,#666666,ascii
+#########/\
+#_#######\/#######_
+(______/\/\/\______)
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#______      ______#
+(_#####\/\/\/#####_)
+#########/\
+#########\/
+asciiend
+
+      x = x + 10
+      y = y + 4
+      >`@x - string.Size(fish.name) / 2@,@y@,@fish.name@
+
+      x = x - 4
+      y = y + 2
+      fish.Draw(x, y)
+
+      x = x - 4
+      y = y + 4
+      >`@x@,@y@,@string.Format(te.xt(tid_fish_ui_weight), fish.weight)@
+
+      ?isRecordWeight
+        y++
+        >`@x@,@y@,@te.xt(tid_fish_ui_record)@
+
+
+func UpdateStateMenu()
+
+    //?key = primaryBegin
+    //  SetState(Throwing)
+    //:?key = ability1Begin
+    //  SetState(Shop)
+
+    // Draw player
+    >o-5,-1,#ffffff,ascii
+#
+#########,
+#####O  /;
+####(|`/´
+####/ /!
+asciiend
+    >o-5,-1,@rod.color@,ascii
+#
+#########,
+########/;
+#######/´
+######/!
+asciiend
+    >o-5,-1,@rod.lineColor@,ascii
+#
+#
+#########;
+########´
+#######!
+asciiend
+
+    ?bighead
+      >o-2,-1,ascii
+#.-.
+(   )
+#`·´
+asciiend
+      ?time % 90 >= 6
+        >o-2,0,
+^('' )
+
+
+func UpdateStateShop()
+    ?key = backBegin
+      SetState(Menu)
+    :
+      shop.Update()
+
+
+func Update()
+  Init()
+
+  import Games/Fishing/FishingHUD
+  import Games/Fishing/FishingLogo
+  import Games/FlyupText
+
+  stateTime++
+
+// TODO - Debug state
+//  >`0,0,State: @state@
+//  >`0,1,STime: @stateTime@
+
+  currentStateFunction()
+
+
+func GetState()
+  return state
+
+
+func AddPlayerAnimCatching()
+  playerAnimCatchingRoot = ui.AddPanel()
+  playerAnimCatchingRoot.x = screen.FromWorldX(pos.x)
+  playerAnimCatchingRoot.y = screen.FromWorldZ(pos.z - pos.y) - 2
+  playerAnimCatchingRoot.w = 1
+  playerAnimCatchingRoot.h = 1
+  playerAnimCatchingRoot.dock = top_left
+
+  // Base layer
+  playerAnimCatching1 = ui.AddAnim(ascii
+#
+##############,
+############.´ \
+###########/    \_O
+#########.´     °\/
+########/        / \
+######.´
+#####/
+###.´
+##/
+,´__ _
+%%
+################,
+##############.´|
+#############/  |
+############/  °|\O
+##########.´     `|
+#########/       / \
+########/
+######.´
+#####/
+####/
+##,´__ _
+asciiend)
+  playerAnimCatchingRoot.Add(playerAnimCatching1)
+  playerAnimCatching1.anchor = top_left
+  playerAnimCatching1.pivotX = 18
+  playerAnimCatching1.pivotY = 3
+  playerAnimCatching1.frame = 0
+
+  // Water
+  playerAnimCatching2 = ui.AddAnim(ascii
+##__ _
+%%
+####__ _
+asciiend)
+  playerAnimCatchingRoot.Add(playerAnimCatching2)
+  playerAnimCatching2.anchor = top_left
+  playerAnimCatching2.color = #bbbbbb
+  playerAnimCatching2.pivotX = 18
+  playerAnimCatching2.pivotY = -7
+  playerAnimCatching2.frame = 0
+
+  // Rod
+  playerAnimCatching3 = ui.AddAnim(ascii
+#
+,
+ \
+  \
+  °\
+%%
+##,
+  |
+  |
+ °|
+asciiend)
+  playerAnimCatchingRoot.Add(playerAnimCatching3)
+  playerAnimCatching3.anchor = top_left
+  playerAnimCatching3.color = rod.color
+  playerAnimCatching3.pivotX = 4
+  playerAnimCatching3.pivotY = 3
+  playerAnimCatching3.frame = 0
+
+// Line
+  playerAnimCatching4 = ui.AddAnim(ascii
+#
+#
+############.´
+###########/
+#########.´
+########/
+######.´
+#####/
+###.´
+##/
+,´
+%%
+#
+##############.´
+#############/
+############/
+##########.´
+#########/
+########/
+######.´
+#####/
+####/
+##,´
+asciiend)
+  playerAnimCatchingRoot.Add(playerAnimCatching4)
+  playerAnimCatching4.anchor = top_left
+  playerAnimCatching4.color = rod.lineColor
+  playerAnimCatching4.pivotX = 18
+  playerAnimCatching4.pivotY = 3
+  playerAnimCatching4.frame = 0
+  playerAnimCatching4.Stop()
+
+
+func AddPlayerAnimBigHead(parentPanel)
+  playerAnimBigHead = ui.AddAnim(ascii
+#.-.
+(   )
+#`·´
+%% {repeat:14}
+#.-.
+('' )
+#`·´
+asciiend)
+  parentPanel.Add(playerAnimBigHead)
+  playerAnimBigHead.anchor = top_left
+  playerAnimBigHead.pivotX = 2
+  playerAnimBigHead.pivotY = 2
+  playerAnimBigHead.duration = 90
+  playerAnimBigHead.loop = true
+  playerAnimBigHead.Play()
+

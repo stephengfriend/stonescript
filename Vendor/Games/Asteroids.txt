@@ -1,0 +1,119 @@
+// Asteroids
+// by: standardcombo and skyDelight
+var version = "1.2.2"
+
+// Instructions on how to use it
+// 1. Put Asteroids.txt in the directory: Stonescript\Games
+// 2. Put Asteroids folder in the directory: Stonescript\Games
+// 3. Put Vector.txt in the directory: Stonescript\Components and replace the original one
+// 4. Open the Mind Stone. In a new line write: import Games\Asteroids
+// 5. Go to Deadwood Waterfall
+
+var logoX = 5
+var logoY = 6
+var versionX = 75
+var versionY = 12
+
+var logo = ascii
+####A######SSSSS##TTTTTT##EEEEEE##RRRRR#####OOOOO###IIIIII##DDDDDD####SSSSS##
+###A#A####S#########TT####E#######R####R###O#####O####II####D#####D##S#######
+##AAAAA####SSSSS####TT####EEEEEE##RRRRR####O#####O####II####D#####D###SSSSS##
+#A#####A########S###TT####E#######R####R###O#####O####II####D#####D########S#
+A#######A#SSSSSS####TT####EEEEEE##R#####R###OOOOO###IIIIII##DDDDDD###SSSSSS##
+asciiend
+
+?string.Equals(loc.id,waterfall)
+  ?loc.begin
+    disable banner
+    disable pause
+    ambient.Stop()
+    
+    var gamePanel = ui.AddPanel()
+    gamePanel.w = screen.w
+    gamePanel.h = screen.h
+    gamePanel.style = 0
+    
+    var newButton = ui.AddButton() 
+    newButton.y = 3
+    newButton.w = 10
+    newButton.h = 3
+    newButton.text = te.xt("Play")
+    newButton.SetPressed(newGame)
+    newButton.visible = true
+    
+    var continueButton = ui.AddButton()
+    continueButton.y = 6
+    continueButton.w = 10
+    continueButton.h = 3 
+    continueButton.text = te.xt("Continue")
+    continueButton.SetPressed(continueGame)
+    continueButton.visible = false
+
+    var exitButton = ui.AddButton()
+    exitButton.y = 6
+    exitButton.w = 10
+    exitButton.h = 3
+    exitButton.text = te.xt("Exit")
+    exitButton.SetPressed(exitGame)
+    exitButton.visible = true
+
+    var returnButton = ui.AddButton()
+    returnButton.w = 5
+    returnButton.h = 3
+    returnButton.anchor = top_right
+    returnButton.dock = top_right
+    returnButton.text = "X"
+    returnButton.SetPressed(returnMeun)
+    returnButton.visible = false
+
+    var gameActivated = false
+
+    stonescript.SetMaxExecutionTime(2000)
+
+  var game = new Games\Asteroids\AsteroidsGame
+  >`0,0,@game.backgroundSprite@
+  
+  ?gameActivated
+    game.Update()
+    game.Draw()
+  :
+    >`@logoX@,@logoY@,@logo@
+    >`@versionX@,@versionY@,v@version@
+    ?te.language = "ZH-CN"
+      >`1,@screen.h - 4@,左右键转动飞船
+      >`1,@screen.h - 3@,上键前进
+      >`1,@screen.h - 2@,松开上键发射子弹
+    :?te.language = "PT-BR"
+      >`1,@screen.h - 4@,Use esquerda e direita para girar
+      >`1,@screen.h - 3@,Aperte para cima para mover
+      >`1,@screen.h - 2@,Aperte para cima para atirar
+    :
+      >`1,@screen.h - 4@,Use left and right to rotate
+      >`1,@screen.h - 3@,Use up to thrust
+      >`1,@screen.h - 2@,Depress up to shoot
+
+func newGame()
+  game.Init()
+  gameActivated = true
+  newButton.visible = false
+  continueButton.visible = false
+  exitButton.visible = false
+  returnButton.visible = true
+
+func continueGame()
+  gameActivated = true
+  newButton.visible = false
+  continueButton.visible = false
+  exitButton.visible = false
+  returnButton.visible = true
+
+func exitGame()
+  loc.Leave()
+
+func returnMeun()
+  gameActivated = false
+  exitButton.y = 9
+  newButton.visible = true
+  continueButton.visible = true
+  exitButton.visible = true
+  returnButton.visible = false

@@ -112,7 +112,7 @@ func survive()
     brew stone + tar
   ?hp <= 16
     activate potion
-  ?target = waypoint | foe.distance > 32
+  ?target = waypoint | foe.distance > 17
     ?hp < maxhp
       equipL ouroboros
     :
@@ -121,7 +121,7 @@ func survive()
 
 func attack()
   ?foe.distance <= 24
-    ?foe.distance <= 8 & foe ! immune_to_physica
+    ?foe.distance <= 8 & foe ! immune_to_physical
       equip_melee()
     :
       equip_ranged()

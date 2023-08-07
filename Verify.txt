@@ -1,3 +1,0 @@
-?loc = Waterfall & time = 90
-  ui.ShowBanner("Congratulations, you have successfully imported:", "@stephengfriend/stonescript!")
-  loc.Pause()
