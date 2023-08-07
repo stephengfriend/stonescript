@@ -139,8 +139,6 @@ func gather()
   ?loc = rocky & foe = boss
     ?res.stone < 1024
       loc.Leave()
-    :
-      loc.Pause()
   ?pickup.distance < 10
     equipL star
     equipR shield
