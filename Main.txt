@@ -1,11 +1,11 @@
-import Vendor/Cosmetics/Hats/StarCloak
-import Vendor/Cosmetics/Hats/Headphones
+// import Vendor/Cosmetics/Hats/StarCloak
+// import Vendor/Cosmetics/Hats/Headphones
 
 ?loc.name = hotspring | loc.name = shop
   return
 
 ?loc.name = haunted gate
-  import Vendor/UI/FreeChestTracker
+  // import Vendor/UI/FreeChestTracker
   return
 
 ?!loc.loop & time = 1
