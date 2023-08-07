@@ -1,0 +1,19 @@
+import Automate
+
+?foe=phase1
+  EquipR +5 vigor
+  EquipL +2 vigor
+:?foe=phase2
+  EquipR +5 vigor
+  EquipL +2 vigor
+:?foe.damage = 1 & item.GetCooldown("hammer")<= 0 |
+^item.GetCooldown("hammer") >= 647
+  equip heavy hammer
+  ?item.CanActivate("hammer")
+    activate R
+:?foe.state = 115 & foe.time >= 60
+  equipR mind
+  equipL poison wand
+:?foe=phase3
+  EquipR comp
+  EquipL vigor
