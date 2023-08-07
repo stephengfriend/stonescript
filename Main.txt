@@ -9,4 +9,4 @@ import Vendor/Cosmetics/Hats/Headphones
   return
 
 ?!loc.loop
-  ui.ShowBanner("Automation imported:", "@stephengfriend/stonescript")
+  ui.ShowBanner("Automation imported:", "stephengfriend/stonescript")
