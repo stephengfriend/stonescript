@@ -66,21 +66,18 @@ func equip_sword()
   :
     equipL heavy
 
-func use_melee()
+func equip_melee()
   ?foe.armor > 0
     equip_hammer()
   :
     equip_sword()
     equip_shield()
 
-func equip_melee()
-  ?foe = boss
-    use_melee()
-
-    ?foe ! angry | foe ! phase3
-      use_blade()
-  :
-    use_melee()
+// func equip_melee()
+//   ?foe = boss
+//     use_melee()
+//   :
+//     use_melee()
 
 func equip_ranged()
   ?foe = boss & foe ! bronze
