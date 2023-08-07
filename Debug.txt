@@ -1,0 +1,13 @@
+?target
+  >Target: @target@
+?foe
+  var f_attrs = string.Split(foe)
+
+  >`0,6,Foe attributes:
+  for i = 0 .. f_attrs.Count()-1
+    >`0,@i+7@,- @f_attrs[i]@
+?harvest
+  var h_attrs = string.Split(harvest)
+  >`16,6,Harvest attrs:
+  for j = 0 .. h_attrs.Count()-1
+    >`16,@j+7@,- @h_attrs[j]@
