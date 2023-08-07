@@ -10,7 +10,7 @@ import Cosmetics/PetBoo
 import Cosmetics/Hats/Skully
 
 var debug = false
-var pause_at_boss = true
+var pause_at_boss = false
 
 ?foe = boss & pause_at_boss = true
   loc.Pause()
@@ -86,12 +86,12 @@ func use_melee()
 func equip_melee()
   ?foe = boss
     use_melee()
-    
+
     ?foe ! angry
       use_blade()
   :
     use_melee()
-  
+
 func equip_ranged()
   ?foe = boss & foe ! bronze
     equipL hammer
@@ -156,7 +156,7 @@ func gather()
       ?harvest.distance <= 4 &
       ^item.GetCooldown("hatchet") <= 0
         activate R
-      
+
 
 survive()
 attack()
