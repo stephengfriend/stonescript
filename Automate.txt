@@ -10,10 +10,6 @@ import Cosmetics/PetBoo
 import Cosmetics/Hats/Skully
 
 var debug = false
-var pause_at_boss = false
-
-?foe = boss & pause_at_boss = true
-  loc.Pause()
 
 func use_blade()
   ?item.GetCooldown("blade") <= 0
