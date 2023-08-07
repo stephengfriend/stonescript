@@ -5,12 +5,6 @@
 // StoneStoryRPG.com/stonescript
 // -Bezerra, the Sage
 
-import Fishing
-import Cosmetics/PetBoo
-import Cosmetics/Hats/Skully
-
-var debug = false
-
 func use_blade()
   ?item.GetCooldown("blade") <= 0
     equip blade
@@ -38,7 +32,7 @@ func equip_hammer()
   :?foe = vigor
     equipL hammer poison
   :
-    equipL hammer
+    equipL heavy
 
 func equip_shield()
   ?foe = aether
@@ -70,20 +64,20 @@ func equip_sword()
     equipL sword poison +2
     equipR sword poison +3
   :
-    equipL sword
+    equipL heavy
 
 func use_melee()
   ?foe.armor > 0
     equip_hammer()
   :
     equip_sword()
- // equip_shield()
+    equip_shield()
 
 func equip_melee()
   ?foe = boss
     use_melee()
 
-    ?foe ! angry
+    ?foe ! angry | foe ! phase3
       use_blade()
   :
     use_melee()

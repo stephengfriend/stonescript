@@ -7,7 +7,7 @@ import Automate
   equipR vigor 10*
   equipL vigor 6*
 :?foe.damage = 1
-  ?item.GetCooldown("hammer")<= 0 |
+  ?item.GetCooldown("hammer") <= 0 |
   ^item.GetCooldown("hammer") >= 647
     equip heavy hammer
     ?item.CanActivate("hammer")
@@ -16,5 +16,5 @@ import Automate
   equipR mind
   equipL poison wand
 :?foe = phase3
-  equipR comp
+  equipR dash
   equipL vigor
