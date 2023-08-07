@@ -4,9 +4,12 @@ import Vendor/Cosmetics/Hats/Headphones
 ?loc.name = hotspring | loc.name = shop
   return
 
-?loc.name = gate
+?loc.name = haunted gate
   import Vendor/UI/FreeChestTracker
   return
 
-?!loc.loop
-  ui.ShowBanner("Automation imported:", "stephengfriend/stonescript")
+?!loc.loop & time = 1
+  ui.ShowBanner(
+  ^"Currently Automating: " + loc.name,
+  ^"github.com/stephengfriend/stonescript"
+  ^)
